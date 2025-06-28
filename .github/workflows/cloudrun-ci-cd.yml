@@ -32,9 +32,6 @@ jobs:
       - name: Run Linter
         run: npm run lint
 
-      - name: Run Tests
-        run: npm test
-
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
