@@ -1,21 +1,38 @@
-# Builder stage
+# Stage 1: Builder for production dependencies
+FROM node:20-alpine as deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Stage 2: Builder for application
 FROM node:20-alpine as builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm i
-COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY src ./src
+# Add build steps here if needed (e.g., for TypeScript)
 
-# Production stage
+# Stage 3: Final production image
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=builder /app /app
+
+# Copy only production dependencies
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy application files
+COPY --from=builder /app/src ./src
 
 # Create non-root user and set permissions
-RUN adduser -D appuser && chown -R appuser:appuser /app
+RUN addgroup -g 1001 appgroup && \
+    adduser -u 1001 -G appgroup -D appuser && \
+    chown -R appuser:appgroup /app
 USER appuser
 
-EXPOSE 8080
+# Set health check
 HEALTHCHECK --interval=30s --timeout=3s \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
+# Runtime configuration
+ENV NODE_ENV=production
+EXPOSE 8080
 CMD ["node", "src/index.js"]
