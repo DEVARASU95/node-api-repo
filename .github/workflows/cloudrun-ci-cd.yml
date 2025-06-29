@@ -34,9 +34,6 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Update Vulnerable Package
-        run: npm install cross-spawn@7.0.5
-
       - name: Run Linter
         run: npm run lint
 
@@ -82,3 +79,9 @@ jobs:
             --min-instances=0 \
             --max-instances=1 \
             --update-env-vars PORT=8080
+            
+      - name: Clean up credentials
+        run: |
+          rm -f ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
+          rm -f gha-creds-*.json
+        if: always()
