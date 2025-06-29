@@ -22,10 +22,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Update Vulnerable Package
+      - name: Install Dependencies
         run: |
-          npm install cross-spawn@7.0.6 --force
-          npm install
+          npm ci
+          npm i
 
       - name: Run Linter
         run: npm run lint
@@ -34,7 +34,6 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          create_credentials_file: false
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -43,8 +42,8 @@ jobs:
 
       - name: Configure Docker
         run: |
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-          echo "${{ secrets.GCP_SA_KEY }}" | docker login -u _json_key --password-stdin https://${{ env.REGION }}-docker.pkg.dev
+          # Direct Docker login with service account key
+          echo ${{ secrets.GCP_SA_KEY }} | docker login -u _json_key --password-stdin https://${{ env.REGION }}-docker.pkg.dev
 
       - name: Set image name
         id: set-image
@@ -53,16 +52,11 @@ jobs:
           echo "IMAGE_NAME_LATEST=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:latest" >> $GITHUB_ENV
 
       - name: Build Docker Image
-        run: |
-          docker build --no-cache -t ${{ env.IMAGE_NAME }} .
-
-      - name: Install Grype
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          grype version
+        run: docker build -t ${{ env.IMAGE_NAME }} .
 
       - name: Scan with Grype
         run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
           grype ${{ env.IMAGE_NAME }} \
             --only-fixed \
             --fail-on high \
