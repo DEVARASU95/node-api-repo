@@ -17,16 +17,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set image name
+        id: set-image
+        run: |
+          echo "IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:${{ github.sha }}" >> $GITHUB_ENV
+          echo "IMAGE_NAME_LATEST=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:latest" >> $GITHUB_ENV
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Dependencies
+      - name: Update Vulnerable Package
         run: |
-          npm i
-          npm ci
-
+          npm install cross-spawn@7.0.6 --force
+          npm install
+        
       - name: Run Linter
         run: npm run lint
 
@@ -41,15 +47,7 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Configure Docker
-        run: |
-          # Direct Docker login with service account key
-          echo ${{ secrets.GCP_SA_KEY }} | docker login -u _json_key --password-stdin https://${{ env.REGION }}-docker.pkg.dev
-
-      - name: Set image name
-        id: set-image
-        run: |
-          echo "IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:${{ github.sha }}" >> $GITHUB_ENV
-          echo "IMAGE_NAME_LATEST=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:latest" >> $GITHUB_ENV
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build Docker Image
         run: docker build -t ${{ env.IMAGE_NAME }} .
@@ -79,3 +77,9 @@ jobs:
             --min-instances=0 \
             --max-instances=1 \
             --update-env-vars PORT=8080
+            
+      - name: Clean up credentials
+        run: |
+          rm -f ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
+          rm -f gha-creds-*.json
+        if: always()
