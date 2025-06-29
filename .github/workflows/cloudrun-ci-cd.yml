@@ -28,12 +28,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Dependencies
-        run: npm i
+      - name: Update Vulnerable Package
+        run: |
+          npm install cross-spawn@7.0.6 --force
+          npm install
         
-      - name: Install Dependencies
-        run: npm ci
-
       - name: Run Linter
         run: npm run lint
 
