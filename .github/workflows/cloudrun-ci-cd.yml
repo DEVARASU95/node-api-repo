@@ -24,10 +24,10 @@ jobs:
 
       - name: Install and Update Dependencies
         run: |
-          npm ci
+          npm i
           npm install cross-spawn@7.0.6 --save-exact
           npm install brace-expansion@2.0.2 --save-exact
-          npm install
+          npm ci
 
       - name: Run Linter
         run: npm run lint
