@@ -22,17 +22,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Force Dependency Resolution
+      - name: Install and Update Dependencies
         run: |
-          # Force update vulnerable packages
+          npm ci
           npm install cross-spawn@7.0.6 --save-exact
           npm install brace-expansion@2.0.2 --save-exact
-          
-          # Update lockfile
           npm install
-          
-          # Verify updates
-          npm list cross-spawn brace-expansion
 
       - name: Run Linter
         run: npm run lint
@@ -60,14 +55,25 @@ jobs:
       - name: Build Docker Image
         run: docker build --no-cache -t ${{ env.IMAGE_NAME }} .
 
-      - name: Verify Dependencies
+      - name: Install Trivy
         run: |
-          # Check for vulnerable packages
-          docker run --rm ${{ env.IMAGE_NAME }} npm list cross-spawn brace-expansion
-          
-          # Check installed versions
-          docker run --rm ${{ env.IMAGE_NAME }} npm list cross-spawn --parseable | grep -oE '[^/]+$' | grep -q '7.0.6' || exit 1
-          docker run --rm ${{ env.IMAGE_NAME }} npm list brace-expansion --parseable | grep -oE '[^/]+$' | grep -q '2.0.2' || exit 1
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Scan with Trivy (Custom Config)
+        run: |
+          trivy image --reset
+          trivy image \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --vuln-type os,library \
+            --ignorefile .trivyignore \
+            ${{ env.IMAGE_NAME }}
 
       - name: Push to Artifact Registry
         run: |
