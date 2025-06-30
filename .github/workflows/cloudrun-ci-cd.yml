@@ -29,8 +29,12 @@ jobs:
           node-version: '20'
 
       - name: Update Vulnerable Package
-        run: npm install cross-spawn@7.0.6 --force
-
+        run: |
+          # Update both package.json AND package-lock.json
+          npm install cross-spawn@7.0.6 --save-exact --force
+          
+          # Verify update
+          npm list cross-spawn
       - name: Run Linter
         run: npm run lint
 
