@@ -15,7 +15,10 @@ This project demonstrates a secure CI/CD pipeline for deploying a Node.js API to
 **Live Endpoint**:  
 https://node-api-service-omxwkythmq-uc.a.run.app/
 
-
+// Example Response
+{
+"status": "ok"
+}
 
 # CI/CD Setup Instructions for Node.js App on Google Cloud Run
 
