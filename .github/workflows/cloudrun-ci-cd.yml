@@ -124,8 +124,8 @@ jobs:
             --allow-unauthenticated \
             --port 8080 \
             --min-instances=0 \
-            --max-instances=1 \
-            --update-env-vars PORT=8080
+            --max-instances=1 
+
             
       - name: Clean up credentials
         run: |
