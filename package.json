@@ -1,6 +1,9 @@
 {
     "name": "hello-api",
     "version": "1.0.0",
+    "overrides": {
+        "cross-spawn": "7.0.6"
+    },
     "scripts": {
         "start": "node src/index.js",
         "test": "jest --coverage",

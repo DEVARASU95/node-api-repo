@@ -32,7 +32,10 @@ jobs:
         run: |
           # Update both package.json AND package-lock.json
           npm install cross-spawn@7.0.6 --save-exact --force
-          
+      
+          # Force update lockfile
+          npm install --package-lock-only
+                    
           # Verify update
           npm list cross-spawn
       - name: Run Linter
