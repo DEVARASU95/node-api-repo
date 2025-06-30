@@ -1,6 +1,7 @@
 # Stage 1: Install production dependencies only
 FROM node:20-alpine as deps
 WORKDIR /app
+COPY package.json package-lock.json ./
 RUN npm i
 RUN npm ci --omit=dev
 
