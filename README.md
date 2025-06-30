@@ -22,7 +22,7 @@ https://node-api-service-omxwkythmq-uc.a.run.app/
 
 # CI/CD Setup Instructions for Node.js App on Google Cloud Run
 
-## 1️⃣ Prerequisites
+## 1️⃣ Prerequisites 
 
 Ensure the following are installed and configured:
 
