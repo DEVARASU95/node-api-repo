@@ -17,17 +17,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set image name
+        id: set-image
+        run: |
+          echo "IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:${{ github.sha }}" >> $GITHUB_ENV
+          echo "IMAGE_NAME_LATEST=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:latest" >> $GITHUB_ENV
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install and Update Dependencies
-        run: |
-          npm i
-          npm install cross-spawn@7.0.6 --save-exact
-          npm install brace-expansion@2.0.2 --save-exact
-          npm ci
+      - name: Update Vulnerable Package
+        run: npm install cross-spawn@7.0.6 --force
 
       - name: Run Linter
         run: npm run lint
@@ -43,37 +45,48 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Configure Docker
-        run: |
-          echo ${{ secrets.GCP_SA_KEY }} | docker login -u _json_key --password-stdin https://${{ env.REGION }}-docker.pkg.dev
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Set image name
-        id: set-image
-        run: |
-          echo "IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:${{ github.sha }}" >> $GITHUB_ENV
-          echo "IMAGE_NAME_LATEST=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/node-api:latest" >> $GITHUB_ENV
+      # Docker build optimizations
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker Image
-        run: docker build --no-cache -t ${{ env.IMAGE_NAME }} .
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-buildx-
 
-      - name: Install Trivy
-        run: |
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
-      - name: Scan with Trivy (Custom Config)
-        run: |
-          trivy image --reset
-          trivy image \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            --vuln-type os,library \
-            --ignorefile .trivyignore \
+      - name: Build and tag Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: |
             ${{ env.IMAGE_NAME }}
+            ${{ env.IMAGE_NAME_LATEST }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          push: false
+
+      # Trivy optimizations
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.trivy-cache
+          key: ${{ runner.os }}-trivy-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-trivy-
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@0.16.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          vuln-type: 'os,library'
+          cache-dir: ${{ github.workspace }}/.trivy-cache
 
       - name: Push to Artifact Registry
         run: |
@@ -91,3 +104,9 @@ jobs:
             --min-instances=0 \
             --max-instances=1 \
             --update-env-vars PORT=8080
+            
+      - name: Clean up credentials
+        run: |
+          rm -f ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
+          rm -f gha-creds-*.json
+        if: always()
